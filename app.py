@@ -6,15 +6,17 @@ from ofxparse import OfxParser
 import matplotlib.pyplot as plt
 import io
 import base64
+import fitz
+import pytesseract
+from PIL import Image
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///financeiro.db'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# ✅ Garante que a pasta 'uploads/' exista no ambiente
+# Garante que a pasta de uploads exista
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# ✅ Inicializa o banco de dados
 db.init_app(app)
 with app.app_context():
     db.create_all()
@@ -67,9 +69,37 @@ def importar():
                     )
                     db.session.add(nova)
 
+        elif arquivo.filename.endswith('.pdf'):
+            doc = fitz.open(caminho)
+            for pagina in doc:
+                texto = pagina.get_text()
+                if not texto.strip():
+                    imagem = pagina.get_pixmap()
+                    img_bytes = imagem.tobytes("png")
+                    imagem_pil = Image.open(io.BytesIO(img_bytes))
+                    texto = pytesseract.image_to_string(imagem_pil)
+
+                linhas = texto.split('\n')
+                for linha in linhas:
+                    if 'R$' in linha:
+                        partes = linha.split()
+                        try:
+                            valor_str = partes[-1].replace('R$', '').replace('.', '').replace(',', '.')
+                            valor = float(valor_str)
+                            descricao = ' '.join(partes[:-1])
+                            tipo = 'despesa' if valor < 0 else 'receita'
+                            nova = Transacao(
+                                tipo=tipo,
+                                descricao=descricao,
+                                valor=abs(valor),
+                                categoria='PDF Importado'
+                            )
+                            db.session.add(nova)
+                        except:
+                            continue
+
         db.session.commit()
         return redirect('/')
-
     return render_template('importar.html')
 
 @app.route('/relatorio')
@@ -105,7 +135,6 @@ def relatorio():
 
     return render_template('relatorio.html', receitas=receitas, despesas=despesas, saldo=saldo, grafico=grafico)
 
-# 🔧 Configuração para Render
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
