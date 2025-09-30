@@ -10,9 +10,12 @@ import base64
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///financeiro.db'
 app.config['UPLOAD_FOLDER'] = 'uploads'
-db.init_app(app)
 
-# ✅ Criação do banco fora do __main__, para funcionar no Render
+# ✅ Garante que a pasta 'uploads/' exista no ambiente
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# ✅ Inicializa o banco de dados
+db.init_app(app)
 with app.app_context():
     db.create_all()
 
