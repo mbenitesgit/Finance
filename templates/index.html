@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Resumo Financeiro</h2>
+<table>
+    <tr><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Categoria</th></tr>
+    {% for t in transacoes %}
+    <tr>
+        <td>{{ t.tipo }}</td>
+        <td>{{ t.descricao }}</td>
+        <td>R$ {{ t.valor }}</td>
+        <td>{{ t.categoria }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

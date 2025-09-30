@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Importar Extrato Bancário</h2>
+<form method="post" enctype="multipart/form-data">
+    <label>Escolha o arquivo (CSV, OFX):</label>
+    <input type="file" name="arquivo" required><br><br>
+    <button type="submit">Importar</button>
+</form>
+{% endblock %}

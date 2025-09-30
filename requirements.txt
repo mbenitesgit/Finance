@@ -1,0 +1,5 @@
+Flask
+Flask-SQLAlchemy
+pandas
+ofxparse
+matplotlib
