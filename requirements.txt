@@ -4,3 +4,6 @@ pandas
 ofxparse
 matplotlib
 gunicorn
+pytesseract
+PyMuPDF
+Pillow
