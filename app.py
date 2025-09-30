@@ -12,6 +12,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///financeiro.db'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 db.init_app(app)
 
+# ✅ Criação do banco fora do __main__, para funcionar no Render
+with app.app_context():
+    db.create_all()
+
 @app.route('/')
 def index():
     transacoes = Transacao.query.all()
@@ -100,7 +104,5 @@ def relatorio():
 
 # 🔧 Configuração para Render
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
