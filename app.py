@@ -53,7 +53,9 @@ def importar():
         caminho = os.path.join(app.config['UPLOAD_FOLDER'], arquivo.filename)
         arquivo.save(caminho)
 
-        if arquivo.filename.endswith('.csv'):
+        nome = arquivo.filename.lower()
+
+        if nome.endswith('.csv'):
             df = pd.read_csv(caminho)
             for _, row in df.iterrows():
                 data = pd.to_datetime(row.get('Data', datetime.today()), dayfirst=True).date()
@@ -66,7 +68,7 @@ def importar():
                 )
                 db.session.add(nova)
 
-        elif arquivo.filename.endswith('.ofx'):
+        elif nome.endswith('.ofx'):
             with open(caminho) as f:
                 ofx = OfxParser.parse(f)
                 for trans in ofx.account.statement.transactions:
@@ -79,7 +81,7 @@ def importar():
                     )
                     db.session.add(nova)
 
-        elif arquivo.filename.endswith('.pdf'):
+        elif nome.endswith('.pdf'):
             doc = fitz.open(caminho)
             for pagina in doc:
                 texto = pagina.get_text()
@@ -111,29 +113,31 @@ def importar():
                         except:
                             continue
 
-        elif arquivo.filename.endswith('.txt') or arquivo.filename.endswith('.ofc'):
-            with open(caminho, encoding='utf-8') as f:
-                linhas = f.readlines()
-                for linha in linhas:
-                    if 'R$' in linha or linha.strip():
-                        partes = linha.strip().split()
-                        match = re.search(r'\d{2}/\d{2}/\d{4}', linha)
-                        data = datetime.strptime(match.group(), '%d/%m/%Y').date() if match else datetime.today().date()
+        elif nome.endswith('.txt') or nome.endswith('.ofc') or nome.endswith('.ofc.txt'):
+            try:
+                df = pd.read_csv(caminho, sep=';', quotechar='"')
+                if {'Data_Mov', 'Historico', 'Valor', 'Deb_Cred'}.issubset(df.columns):
+                    for _, row in df.iterrows():
                         try:
-                            valor_str = partes[-1].replace('R$', '').replace('.', '').replace(',', '.')
-                            valor = float(valor_str)
-                            descricao = ' '.join(partes[:-1])
-                            tipo = 'despesa' if valor < 0 else 'receita'
+                            data = datetime.strptime(str(row['Data_Mov']), '%Y%m%d').date()
+                            descricao = row['Historico']
+                            valor = float(row['Valor'])
+                            tipo = 'despesa' if row['Deb_Cred'].strip().upper() == 'D' else 'receita'
                             nova = Transacao(
                                 tipo=tipo,
                                 descricao=descricao,
-                                valor=abs(valor),
-                                categoria='TXT/OFC Importado',
+                                valor=valor,
+                                categoria='Caixa TXT/OFC',
                                 data=data
                             )
                             db.session.add(nova)
-                        except:
+                        except Exception as e:
+                            print("Erro ao importar linha:", e)
                             continue
+                else:
+                    print("Arquivo não possui colunas esperadas.")
+            except Exception as e:
+                print("Erro ao ler arquivo como CSV:", e)
 
         db.session.commit()
         return redirect('/')
