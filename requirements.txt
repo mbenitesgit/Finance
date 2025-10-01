@@ -6,3 +6,4 @@ ofxparse
 PyMuPDF
 pytesseract
 Pillow
+gunicorn
