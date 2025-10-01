@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-flask
-flask_sqlalchemy
-pandas
-=======
 flask
 flask_sqlalchemy
 pandas
@@ -11,4 +6,3 @@ ofxparse
 PyMuPDF
 pytesseract
 Pillow
->>>>>>> Atualização do app.py com suporte a data
