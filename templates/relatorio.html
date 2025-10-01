@@ -1,10 +1,13 @@
-{% extends 'base.html' %}
-{% block content %}
-<h2>Relatório Financeiro</h2>
-<p><strong>Total de Receitas:</strong> R$ {{ receitas }}</p>
-<p><strong>Total de Despesas:</strong> R$ {{ despesas }}</p>
-<p><strong>Saldo Atual:</strong> R$ {{ saldo }}</p>
-
-<h3>Gráfico de Movimentações</h3>
-<img src="data:image/png;base64,{{ grafico }}" alt="Gráfico financeiro">
-{% endblock %}
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Relatório Financeiro</title>
+</head>
+<body>
+  <h1>Relatório</h1>
+  <p>Total de receitas: R$ {{ '%.2f'|format(receitas) }}</p>
+  <p>Total de despesas: R$ {{ '%.2f'|format(despesas) }}</p>
+  <p>Saldo: R$ {{ '%.2f'|format(saldo) }}</p>
+  <img src="data:image/png;base64,{{ grafico }}" alt="Gráfico de movimentações">
+</body>
+</html>

@@ -1,15 +1,17 @@
-{% extends 'base.html' %}
-{% block content %}
-<h2>Resumo Financeiro</h2>
-<table>
-    <tr><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Categoria</th></tr>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Minhas Transações</title>
+</head>
+<body>
+  <h1>Transações</h1>
+  <a href="/cadastro">Cadastrar nova</a> |
+  <a href="/importar">Importar extrato</a> |
+  <a href="/relatorio">Ver relatório</a>
+  <ul>
     {% for t in transacoes %}
-    <tr>
-        <td>{{ t.tipo }}</td>
-        <td>{{ t.descricao }}</td>
-        <td>R$ {{ t.valor }}</td>
-        <td>{{ t.categoria }}</td>
-    </tr>
+      <li>{{ t.data.strftime('%d/%m/%Y') }} - {{ t.tipo }} - {{ t.descricao }} - R$ {{ '%.2f'|format(t.valor) }} - {{ t.categoria }}</li>
     {% endfor %}
-</table>
-{% endblock %}
+  </ul>
+</body>
+</html>

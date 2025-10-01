@@ -9,6 +9,8 @@ import base64
 import fitz
 import pytesseract
 from PIL import Image
+import re
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///financeiro.db'
@@ -22,7 +24,7 @@ with app.app_context():
 
 @app.route('/')
 def index():
-    transacoes = Transacao.query.all()
+    transacoes = Transacao.query.order_by(Transacao.data.desc()).all()
     return render_template('index.html', transacoes=transacoes)
 
 @app.route('/cadastro', methods=['GET', 'POST'])
@@ -32,7 +34,13 @@ def cadastro():
         descricao = request.form['descricao']
         valor = float(request.form['valor'])
         categoria = request.form['categoria']
-        nova = Transacao(tipo=tipo, descricao=descricao, valor=valor, categoria=categoria)
+        nova = Transacao(
+            tipo=tipo,
+            descricao=descricao,
+            valor=valor,
+            categoria=categoria,
+            data=datetime.today().date()
+        )
         db.session.add(nova)
         db.session.commit()
         return redirect('/')
@@ -48,11 +56,13 @@ def importar():
         if arquivo.filename.endswith('.csv'):
             df = pd.read_csv(caminho)
             for _, row in df.iterrows():
+                data = pd.to_datetime(row.get('Data', datetime.today()), dayfirst=True).date()
                 nova = Transacao(
                     tipo='despesa' if row['Valor'] < 0 else 'receita',
                     descricao=row['Descrição'],
                     valor=abs(row['Valor']),
-                    categoria=row.get('Categoria', 'Importado')
+                    categoria=row.get('Categoria', 'CSV Importado'),
+                    data=data
                 )
                 db.session.add(nova)
 
@@ -64,7 +74,8 @@ def importar():
                         tipo='despesa' if trans.amount < 0 else 'receita',
                         descricao=trans.memo,
                         valor=abs(trans.amount),
-                        categoria='Importado'
+                        categoria='OFX Importado',
+                        data=trans.date.date()
                     )
                     db.session.add(nova)
 
@@ -82,6 +93,8 @@ def importar():
                 for linha in linhas:
                     if 'R$' in linha:
                         partes = linha.strip().split()
+                        match = re.search(r'\d{2}/\d{2}/\d{4}', linha)
+                        data = datetime.strptime(match.group(), '%d/%m/%Y').date() if match else datetime.today().date()
                         try:
                             valor_str = partes[-1].replace('R$', '').replace('.', '').replace(',', '.')
                             valor = float(valor_str)
@@ -91,18 +104,21 @@ def importar():
                                 tipo=tipo,
                                 descricao=descricao,
                                 valor=abs(valor),
-                                categoria='PDF Importado'
+                                categoria='PDF Importado',
+                                data=data
                             )
                             db.session.add(nova)
                         except:
                             continue
 
-        elif arquivo.filename.endswith('.txt'):
+        elif arquivo.filename.endswith('.txt') or arquivo.filename.endswith('.ofc'):
             with open(caminho, encoding='utf-8') as f:
                 linhas = f.readlines()
                 for linha in linhas:
                     if 'R$' in linha or linha.strip():
                         partes = linha.strip().split()
+                        match = re.search(r'\d{2}/\d{2}/\d{4}', linha)
+                        data = datetime.strptime(match.group(), '%d/%m/%Y').date() if match else datetime.today().date()
                         try:
                             valor_str = partes[-1].replace('R$', '').replace('.', '').replace(',', '.')
                             valor = float(valor_str)
@@ -112,28 +128,8 @@ def importar():
                                 tipo=tipo,
                                 descricao=descricao,
                                 valor=abs(valor),
-                                categoria='TXT Importado'
-                            )
-                            db.session.add(nova)
-                        except:
-                            continue
-
-        elif arquivo.filename.endswith('.ofc'):
-            with open(caminho, encoding='utf-8') as f:
-                linhas = f.readlines()
-                for linha in linhas:
-                    if 'R$' in linha or 'TRN' in linha:
-                        partes = linha.strip().split()
-                        try:
-                            valor_str = partes[-1].replace('R$', '').replace('.', '').replace(',', '.')
-                            valor = float(valor_str)
-                            descricao = ' '.join(partes[:-1])
-                            tipo = 'despesa' if valor < 0 else 'receita'
-                            nova = Transacao(
-                                tipo=tipo,
-                                descricao=descricao,
-                                valor=abs(valor),
-                                categoria='OFC Importado'
+                                categoria='TXT/OFC Importado',
+                                data=data
                             )
                             db.session.add(nova)
                         except:
@@ -152,7 +148,7 @@ def relatorio():
 
     meses = {}
     for t in transacoes:
-        mes = t.descricao[:7] if '-' in t.descricao else 'Outro'
+        mes = t.data.strftime('%Y-%m')
         if mes not in meses:
             meses[mes] = {'receita': 0, 'despesa': 0}
         meses[mes][t.tipo] += t.valor

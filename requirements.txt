@@ -1,9 +1,14 @@
-Flask
-Flask-SQLAlchemy
+<<<<<<< HEAD
+flask
+flask_sqlalchemy
 pandas
-ofxparse
+=======
+flask
+flask_sqlalchemy
+pandas
 matplotlib
-gunicorn
-pytesseract
+ofxparse
 PyMuPDF
+pytesseract
 Pillow
+>>>>>>> Atualização do app.py com suporte a data

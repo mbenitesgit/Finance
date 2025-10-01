@@ -1,9 +1,15 @@
-{% extends 'base.html' %}
-{% block content %}
-<h2>Importar Extrato Bancário</h2>
-<form method="post" enctype="multipart/form-data">
-    <label>Escolha o arquivo (CSV, OFX):</label>
-    <input type="file" name="arquivo" required><br><br>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Importar Extrato</title>
+</head>
+<body>
+  <h1>Importar Extrato Bancário</h1>
+  <form method="POST" enctype="multipart/form-data">
+    <label for="arquivo">Escolha o arquivo:</label>
+    <input type="file" name="arquivo" accept=".csv,.ofx,.pdf,.txt,.ofc" required><br>
+    <p>Formatos suportados: CSV, OFX, PDF, TXT, OFC</p>
     <button type="submit">Importar</button>
-</form>
-{% endblock %}
+  </form>
+</body>
+</html>
