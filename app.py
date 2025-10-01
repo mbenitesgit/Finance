@@ -14,7 +14,6 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///financeiro.db'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# Garante que a pasta de uploads exista
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db.init_app(app)
@@ -82,7 +81,7 @@ def importar():
                 linhas = texto.split('\n')
                 for linha in linhas:
                     if 'R$' in linha:
-                        partes = linha.split()
+                        partes = linha.strip().split()
                         try:
                             valor_str = partes[-1].replace('R$', '').replace('.', '').replace(',', '.')
                             valor = float(valor_str)
@@ -93,6 +92,48 @@ def importar():
                                 descricao=descricao,
                                 valor=abs(valor),
                                 categoria='PDF Importado'
+                            )
+                            db.session.add(nova)
+                        except:
+                            continue
+
+        elif arquivo.filename.endswith('.txt'):
+            with open(caminho, encoding='utf-8') as f:
+                linhas = f.readlines()
+                for linha in linhas:
+                    if 'R$' in linha or linha.strip():
+                        partes = linha.strip().split()
+                        try:
+                            valor_str = partes[-1].replace('R$', '').replace('.', '').replace(',', '.')
+                            valor = float(valor_str)
+                            descricao = ' '.join(partes[:-1])
+                            tipo = 'despesa' if valor < 0 else 'receita'
+                            nova = Transacao(
+                                tipo=tipo,
+                                descricao=descricao,
+                                valor=abs(valor),
+                                categoria='TXT Importado'
+                            )
+                            db.session.add(nova)
+                        except:
+                            continue
+
+        elif arquivo.filename.endswith('.ofc'):
+            with open(caminho, encoding='utf-8') as f:
+                linhas = f.readlines()
+                for linha in linhas:
+                    if 'R$' in linha or 'TRN' in linha:
+                        partes = linha.strip().split()
+                        try:
+                            valor_str = partes[-1].replace('R$', '').replace('.', '').replace(',', '.')
+                            valor = float(valor_str)
+                            descricao = ' '.join(partes[:-1])
+                            tipo = 'despesa' if valor < 0 else 'receita'
+                            nova = Transacao(
+                                tipo=tipo,
+                                descricao=descricao,
+                                valor=abs(valor),
+                                categoria='OFC Importado'
                             )
                             db.session.add(nova)
                         except:
