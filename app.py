@@ -11,6 +11,7 @@ import pytesseract
 from PIL import Image
 import re
 from datetime import datetime
+import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///financeiro.db'
@@ -56,66 +57,77 @@ def importar():
         nome = arquivo.filename.lower()
 
         if nome.endswith('.csv'):
-            df = pd.read_csv(caminho)
-            for _, row in df.iterrows():
-                data = pd.to_datetime(row.get('Data', datetime.today()), dayfirst=True).date()
-                nova = Transacao(
-                    tipo='despesa' if row['Valor'] < 0 else 'receita',
-                    descricao=row['Descrição'],
-                    valor=abs(row['Valor']),
-                    categoria=row.get('Categoria', 'CSV Importado'),
-                    data=data
-                )
-                db.session.add(nova)
-
-        elif nome.endswith('.ofx'):
-            with open(caminho) as f:
-                ofx = OfxParser.parse(f)
-                for trans in ofx.account.statement.transactions:
+            try:
+                df = pd.read_csv(caminho)
+                df.columns = df.columns.str.strip().str.replace('"', '')
+                for _, row in df.iterrows():
+                    data = pd.to_datetime(row.get('Data', datetime.today()), dayfirst=True).date()
                     nova = Transacao(
-                        tipo='despesa' if trans.amount < 0 else 'receita',
-                        descricao=trans.memo,
-                        valor=abs(trans.amount),
-                        categoria='OFX Importado',
-                        data=trans.date.date()
+                        tipo='despesa' if row['Valor'] < 0 else 'receita',
+                        descricao=row['Descrição'],
+                        valor=abs(row['Valor']),
+                        categoria=row.get('Categoria', 'CSV Importado'),
+                        data=data
                     )
                     db.session.add(nova)
+            except Exception as e:
+                print("Erro ao importar CSV:", e)
+
+        elif nome.endswith('.ofx'):
+            try:
+                with open(caminho) as f:
+                    ofx = OfxParser.parse(f)
+                    for trans in ofx.account.statement.transactions:
+                        nova = Transacao(
+                            tipo='despesa' if trans.amount < 0 else 'receita',
+                            descricao=trans.memo,
+                            valor=abs(trans.amount),
+                            categoria='OFX Importado',
+                            data=trans.date.date()
+                        )
+                        db.session.add(nova)
+            except Exception as e:
+                print("Erro ao importar OFX:", e)
 
         elif nome.endswith('.pdf'):
-            doc = fitz.open(caminho)
-            for pagina in doc:
-                texto = pagina.get_text()
-                if not texto.strip():
-                    imagem = pagina.get_pixmap()
-                    img_bytes = imagem.tobytes("png")
-                    imagem_pil = Image.open(io.BytesIO(img_bytes))
-                    texto = pytesseract.image_to_string(imagem_pil)
+            try:
+                doc = fitz.open(caminho)
+                for pagina in doc:
+                    texto = pagina.get_text()
+                    if not texto.strip():
+                        imagem = pagina.get_pixmap()
+                        img_bytes = imagem.tobytes("png")
+                        imagem_pil = Image.open(io.BytesIO(img_bytes))
+                        texto = pytesseract.image_to_string(imagem_pil)
 
-                linhas = texto.split('\n')
-                for linha in linhas:
-                    if 'R$' in linha:
-                        partes = linha.strip().split()
-                        match = re.search(r'\d{2}/\d{2}/\d{4}', linha)
-                        data = datetime.strptime(match.group(), '%d/%m/%Y').date() if match else datetime.today().date()
-                        try:
-                            valor_str = partes[-1].replace('R$', '').replace('.', '').replace(',', '.')
-                            valor = float(valor_str)
-                            descricao = ' '.join(partes[:-1])
-                            tipo = 'despesa' if valor < 0 else 'receita'
-                            nova = Transacao(
-                                tipo=tipo,
-                                descricao=descricao,
-                                valor=abs(valor),
-                                categoria='PDF Importado',
-                                data=data
-                            )
-                            db.session.add(nova)
-                        except:
-                            continue
+                    linhas = texto.split('\n')
+                    for linha in linhas:
+                        if 'R$' in linha:
+                            partes = linha.strip().split()
+                            match = re.search(r'\d{2}/\d{2}/\d{4}', linha)
+                            data = datetime.strptime(match.group(), '%d/%m/%Y').date() if match else datetime.today().date()
+                            try:
+                                valor_str = partes[-1].replace('R$', '').replace('.', '').replace(',', '.')
+                                valor = float(valor_str)
+                                descricao = ' '.join(partes[:-1])
+                                tipo = 'despesa' if valor < 0 else 'receita'
+                                nova = Transacao(
+                                    tipo=tipo,
+                                    descricao=descricao,
+                                    valor=abs(valor),
+                                    categoria='PDF Importado',
+                                    data=data
+                                )
+                                db.session.add(nova)
+                            except:
+                                continue
+            except Exception as e:
+                print("Erro ao importar PDF:", e)
 
         elif nome.endswith('.txt') or nome.endswith('.ofc') or nome.endswith('.ofc.txt'):
             try:
                 df = pd.read_csv(caminho, sep=';', quotechar='"')
+                df.columns = df.columns.str.strip().str.replace('"', '')
                 if {'Data_Mov', 'Historico', 'Valor', 'Deb_Cred'}.issubset(df.columns):
                     for _, row in df.iterrows():
                         try:
@@ -132,12 +144,39 @@ def importar():
                             )
                             db.session.add(nova)
                         except Exception as e:
-                            print("Erro ao importar linha:", e)
+                            print("Erro ao importar linha TXT/OFC:", e)
                             continue
                 else:
-                    print("Arquivo não possui colunas esperadas.")
+                    print("Arquivo TXT/OFC não possui colunas esperadas:", df.columns)
             except Exception as e:
-                print("Erro ao ler arquivo como CSV:", e)
+                print("Erro ao ler TXT/OFC como CSV:", e)
+
+        elif nome.endswith('.xml'):
+            try:
+                tree = ET.parse(caminho)
+                root = tree.getroot()
+                for elem in root.findall('.//transacao'):
+                    data_str = elem.findtext('data')
+                    descricao = elem.findtext('descricao')
+                    valor_str = elem.findtext('valor')
+                    tipo = elem.findtext('tipo')  # 'receita' ou 'despesa'
+
+                    try:
+                        data = datetime.strptime(data_str, '%Y-%m-%d').date()
+                        valor = float(valor_str.replace(',', '.'))
+                        nova = Transacao(
+                            tipo=tipo,
+                            descricao=descricao,
+                            valor=abs(valor),
+                            categoria='XML Importado',
+                            data=data
+                        )
+                        db.session.add(nova)
+                    except Exception as e:
+                        print("Erro ao importar transação XML:", e)
+                        continue
+            except Exception as e:
+                print("Erro ao processar arquivo XML:", e)
 
         db.session.commit()
         return redirect('/')
